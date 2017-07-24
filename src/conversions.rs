@@ -27,7 +27,7 @@
 
 #![deny(missing_docs)]
 
-use core::nonzero::NonZero;
+// use core::nonzero::NonZero;
 use error::throw_type_error;
 use glue::RUST_JS_NumberValue;
 use jsapi::AssertSameCompartment;
@@ -245,18 +245,24 @@ impl ToJSValConvertible for Heap<JSVal> {
 }
 
 #[inline]
-unsafe fn convert_int_from_jsval<T, M>(cx: *mut JSContext, value: HandleValue,
+unsafe fn convert_int_from_jsval<T, M>(cx: *mut JSContext,
+                                       value: HandleValue,
                                        option: ConversionBehavior,
-                                       convert_fn: unsafe fn(*mut JSContext, HandleValue) -> Result<M, ()>)
+                                       convert_fn: unsafe fn(*mut JSContext, HandleValue)
+                                                             -> Result<M, ()>)
                                        -> Result<ConversionResult<T>, ()>
     where T: Bounded + Zero + As<f64>,
           M: Zero + As<T>,
           f64: As<T>
 {
     match option {
-        ConversionBehavior::Default => Ok(ConversionResult::Success(try!(convert_fn(cx, value)).cast())),
+        ConversionBehavior::Default => {
+            Ok(ConversionResult::Success(try!(convert_fn(cx, value)).cast()))
+        }
         ConversionBehavior::EnforceRange => enforce_range(cx, try!(ToNumber(cx, value))),
-        ConversionBehavior::Clamp => Ok(ConversionResult::Success(clamp_to(try!(ToNumber(cx, value))))),
+        ConversionBehavior::Clamp => {
+            Ok(ConversionResult::Success(clamp_to(try!(ToNumber(cx, value)))))
+        }
     }
 }
 
@@ -271,7 +277,10 @@ impl ToJSValConvertible for bool {
 // https://heycam.github.io/webidl/#es-boolean
 impl FromJSValConvertible for bool {
     type Config = ();
-    unsafe fn from_jsval(_cx: *mut JSContext, val: HandleValue, _option: ()) -> Result<ConversionResult<bool>, ()> {
+    unsafe fn from_jsval(_cx: *mut JSContext,
+                         val: HandleValue,
+                         _option: ())
+                         -> Result<ConversionResult<bool>, ()> {
         Ok(ToBoolean(val)).map(ConversionResult::Success)
     }
 }
@@ -439,7 +448,10 @@ impl ToJSValConvertible for f32 {
 // https://heycam.github.io/webidl/#es-float
 impl FromJSValConvertible for f32 {
     type Config = ();
-    unsafe fn from_jsval(cx: *mut JSContext, val: HandleValue, _option: ()) -> Result<ConversionResult<f32>, ()> {
+    unsafe fn from_jsval(cx: *mut JSContext,
+                         val: HandleValue,
+                         _option: ())
+                         -> Result<ConversionResult<f32>, ()> {
         let result = ToNumber(cx, val);
         result.map(|f| f as f32).map(ConversionResult::Success)
     }
@@ -456,7 +468,10 @@ impl ToJSValConvertible for f64 {
 // https://heycam.github.io/webidl/#es-double
 impl FromJSValConvertible for f64 {
     type Config = ();
-    unsafe fn from_jsval(cx: *mut JSContext, val: HandleValue, _option: ()) -> Result<ConversionResult<f64>, ()> {
+    unsafe fn from_jsval(cx: *mut JSContext,
+                         val: HandleValue,
+                         _option: ())
+                         -> Result<ConversionResult<f64>, ()> {
         ToNumber(cx, val).map(ConversionResult::Success)
     }
 }
@@ -503,7 +518,10 @@ impl ToJSValConvertible for String {
 // https://heycam.github.io/webidl/#es-USVString
 impl FromJSValConvertible for String {
     type Config = ();
-    unsafe fn from_jsval(cx: *mut JSContext, value: HandleValue, _: ()) -> Result<ConversionResult<String>, ()> {
+    unsafe fn from_jsval(cx: *mut JSContext,
+                         value: HandleValue,
+                         _: ())
+                         -> Result<ConversionResult<String>, ()> {
         let jsstr = ToString(cx, value);
         if jsstr.is_null() {
             debug!("ToString failed");
@@ -548,9 +566,9 @@ impl<T: FromJSValConvertible> FromJSValConvertible for Option<T> {
             Ok(ConversionResult::Success(None))
         } else {
             Ok(match try!(FromJSValConvertible::from_jsval(cx, value, option)) {
-                ConversionResult::Success(v) => ConversionResult::Success(Some(v)),
-                ConversionResult::Failure(v) => ConversionResult::Failure(v),
-            })
+                   ConversionResult::Success(v) => ConversionResult::Success(Some(v)),
+                   ConversionResult::Failure(v) => ConversionResult::Failure(v),
+               })
         }
     }
 }
@@ -566,8 +584,13 @@ impl<T: ToJSValConvertible> ToJSValConvertible for Vec<T> {
         for (index, obj) in self.iter().enumerate() {
             obj.to_jsval(cx, val.handle_mut());
 
-            assert!(JS_DefineElement(cx, js_array.handle(),
-                                     index as u32, val.handle(), JSPROP_ENUMERATE, None, None));
+            assert!(JS_DefineElement(cx,
+                                     js_array.handle(),
+                                     index as u32,
+                                     val.handle(),
+                                     JSPROP_ENUMERATE,
+                                     None,
+                                     None));
         }
 
         rval.set(ObjectValue(js_array.handle().get()));
@@ -579,7 +602,7 @@ impl<T: ToJSValConvertible> ToJSValConvertible for Vec<T> {
 /// but borrows and allows access to the whole ForOfIterator, so
 /// that methods on ForOfIterator can still be used through it.
 struct ForOfIteratorGuard<'a> {
-    root: &'a mut ForOfIterator
+    root: &'a mut ForOfIterator,
 }
 
 impl<'a> ForOfIteratorGuard<'a> {
@@ -587,9 +610,7 @@ impl<'a> ForOfIteratorGuard<'a> {
         unsafe {
             root.iterator.add_to_root_stack(cx);
         }
-        ForOfIteratorGuard {
-            root: root
-        }
+        ForOfIteratorGuard { root: root }
     }
 }
 
@@ -601,7 +622,7 @@ impl<'a> Drop for ForOfIteratorGuard<'a> {
     }
 }
 
-impl<C: Clone, T: FromJSValConvertible<Config=C>> FromJSValConvertible for Vec<T> {
+impl<C: Clone, T: FromJSValConvertible<Config = C>> FromJSValConvertible for Vec<T> {
     type Config = C;
 
     unsafe fn from_jsval(cx: *mut JSContext,
@@ -617,7 +638,7 @@ impl<C: Clone, T: FromJSValConvertible<Config=C>> FromJSValConvertible for Vec<T
         let iterator = &mut *iterator.root;
 
         if !iterator.init(value, ForOfIterator_NonIterableBehavior::AllowNonIterable) {
-            return Err(())
+            return Err(());
         }
 
         if iterator.iterator.ptr.is_null() {
@@ -630,7 +651,7 @@ impl<C: Clone, T: FromJSValConvertible<Config=C>> FromJSValConvertible for Vec<T
             let mut done = false;
             rooted!(in(cx) let mut val = UndefinedValue());
             if !iterator.next(val.handle_mut(), &mut done) {
-                return Err(())
+                return Err(());
             }
 
             if done {
@@ -638,9 +659,9 @@ impl<C: Clone, T: FromJSValConvertible<Config=C>> FromJSValConvertible for Vec<T
             }
 
             ret.push(match try!(T::from_jsval(cx, val.handle(), option.clone())) {
-                ConversionResult::Success(v) => v,
-                ConversionResult::Failure(e) => return Ok(ConversionResult::Failure(e)),
-            });
+                         ConversionResult::Success(v) => v,
+                         ConversionResult::Failure(e) => return Ok(ConversionResult::Failure(e)),
+                     });
         }
 
         Ok(ret).map(ConversionResult::Success)
@@ -656,14 +677,14 @@ impl ToJSValConvertible for *mut JSObject {
     }
 }
 
-// https://heycam.github.io/webidl/#es-object
-impl ToJSValConvertible for NonZero<*mut JSObject> {
-    #[inline]
-    unsafe fn to_jsval(&self, cx: *mut JSContext, rval: MutableHandleValue) {
-        rval.set(ObjectValue(self.get()));
-        maybe_wrap_object_value(cx, rval);
-    }
-}
+// // https://heycam.github.io/webidl/#es-object
+// impl ToJSValConvertible for NonZero<*mut JSObject> {
+//     #[inline]
+//     unsafe fn to_jsval(&self, cx: *mut JSContext, rval: MutableHandleValue) {
+//         rval.set(ObjectValue(self.get()));
+//         maybe_wrap_object_value(cx, rval);
+//     }
+// }
 
 // https://heycam.github.io/webidl/#es-object
 impl ToJSValConvertible for Heap<*mut JSObject> {
